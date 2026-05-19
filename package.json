@@ -1,0 +1,42 @@
+{
+  "name": "and-ai-nextjs",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "db:login": "npx supabase login",
+    "db:link": "npx supabase link",
+    "db:setup": "npx supabase db push",
+    "types:generate": "node scripts/gen-types-remote.mjs",
+    "vercel:login": "vercel login",
+    "vercel:link": "vercel link",
+    "vercel:deploy": "vercel deploy",
+    "vercel:deploy:prod": "vercel deploy --prod",
+    "gemini": "npx gemini",
+    "claude": "npx claude"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.0",
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@anthropic-ai/claude-code": "^2.1.144",
+    "@google/gemini-cli": "^0.42.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "supabase": "^2.100.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vercel": "^54.1.0"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  // Use the TypeScript version from this project's node_modules
+  // rather than the VS Code bundled version. Keeps AI assistants and
+  // type-checking in sync with what `tsc` would actually do.
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
+
+  // Format on save with Prettier
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  // Run ESLint --fix on save
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // Tailwind IntelliSense — enable in TSX/JSX files
+  "tailwindCSS.includeLanguages": {
+    "typescriptreact": "html",
+    "javascriptreact": "html"
+  },
+
+  // Hide build artefacts and generated files from the file explorer
+  // so the AI assistants don't get distracted by them.
+  "files.exclude": {
+    "**/.next": true,
+    "**/node_modules": true,
+    "**/.vercel": true
+  },
+
+  // Allow downloading schemas from the Vercel OpenAPI spec registry, which
+  "json.schemaDownload.trustedDomains": {
+    "https://openapi.vercel.sh": true
+  }
+}

@@ -1,0 +1,21 @@
+{
+  // AI coding assistants — install whichever you prefer.
+  // The first three are AI assistants; the rest are dev essentials
+  // for this template's stack (ESLint, Prettier, Tailwind IntelliSense).
+  "recommendations": [
+    // AI assistants — pick one or more
+    "google.gemini-cli-vscode-ide-companion",
+    "anthropic.claude-code",
+    "Google.geminicodeassist",
+    // "GitHub.copilot",
+
+    // Development essentials
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "tamasfe.even-better-toml"
+
+    // Remote Containers extension — required to use the devcontainer setup in this repo
+    // "ms-vscode-remote.remote-containers"
+  ]
+}
