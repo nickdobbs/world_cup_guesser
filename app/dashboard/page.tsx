@@ -1,11 +1,31 @@
-// EXAMPLE — replace with your actual dashboard.
-// Demonstrates: protected route, fetching user-owned data, RLS-enforced
-// queries, server actions, logout.
-
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { logout } from '../auth/actions';
-import { createNote, deleteNote } from './actions';
+import { savePredictions, simulateResults } from './actions';
+import type { MockFixture, Prediction } from '@/lib/database.helpers';
+import PersonaCard from './PersonaCard';
+
+function scoreOne(fixture: MockFixture, prediction: Prediction | undefined): number {
+  if (
+    fixture.status !== 'finished' ||
+    fixture.home_score === null ||
+    fixture.away_score === null ||
+    !prediction
+  ) {
+    return 0;
+  }
+  if (
+    prediction.predicted_home_score === fixture.home_score &&
+    prediction.predicted_away_score === fixture.away_score
+  ) {
+    return 3;
+  }
+  const actualOutcome = Math.sign(fixture.home_score - fixture.away_score);
+  const predictedOutcome = Math.sign(
+    prediction.predicted_home_score - prediction.predicted_away_score,
+  );
+  return actualOutcome === predictedOutcome ? 1 : 0;
+}
 
 export default async function DashboardPage({
   searchParams,
@@ -13,157 +33,229 @@ export default async function DashboardPage({
   searchParams: Promise<{ error?: string }>;
 }) {
   const { error } = await searchParams;
-
   const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login?next=/dashboard');
 
-  if (!user) {
-    redirect('/auth/login?next=/dashboard');
-  }
+  const { data: fixturesData } = await supabase
+    .from('mock_fixtures')
+    .select('*')
+    .order('id', { ascending: true });
+  const fixtures: MockFixture[] = fixturesData ?? [];
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('username, full_name, avatar_url')
-    .eq('id', user.id)
-    .single();
+  const fixtureIds = fixtures.map((f) => f.id);
+  const { data: predictionsData } = await supabase
+    .from('predictions')
+    .select('*')
+    .in('fixture_id', fixtureIds);
+  const predictions: Prediction[] = predictionsData ?? [];
 
-  const { data: notes } = await supabase
-    .from('notes')
-    .select('id, title, body, created_at')
-    .order('created_at', { ascending: false });
+  const predictionByFixture = new Map<string, Prediction>();
+  for (const p of predictions) predictionByFixture.set(p.fixture_id, p);
 
-  const inputClass =
-    'block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500 dark:focus:border-zinc-100 dark:focus:ring-zinc-100/20';
-  const labelClass =
-    'block text-sm font-medium text-zinc-700 dark:text-zinc-300';
-  const primaryBtn =
-    'inline-flex items-center justify-center rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-900/20 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200';
-  const secondaryBtn =
-    'inline-flex items-center justify-center rounded-md border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 shadow-sm transition-colors hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800';
+  const finishedFixtures = fixtures.filter((f) => f.status === 'finished');
+  const userPoints = fixtures.reduce(
+    (sum, f) => sum + scoreOne(f, predictionByFixture.get(f.id)),
+    0,
+  );
+  const maxPossible = finishedFixtures.length * 3;
+  const rating =
+    finishedFixtures.length === 0
+      ? 5
+      : Math.max(
+          1,
+          Math.min(10, 1 + Math.floor(9 * (userPoints / Math.max(1, maxPossible)))),
+        );
 
   return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-10">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Dashboard
-        </h1>
+    <div className="min-h-screen bg-white text-black">
+      <nav className="sticky top-0 z-50 flex items-center justify-between border-b-2 border-black bg-white px-6 py-4 md:px-12">
+        <div className="text-2xl font-black tracking-tighter uppercase">
+          WE ARE 26
+        </div>
+        <div className="hidden gap-8 md:flex">
+          <span className="border-b-4 border-red-600 pb-1 text-xs font-bold uppercase tracking-widest text-red-600">
+            Predictions
+          </span>
+          <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">
+            Leaderboard
+          </span>
+          <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">
+            Profile
+          </span>
+        </div>
         <form action={logout}>
-          <button type="submit" className={secondaryBtn}>
+          <button
+            type="submit"
+            className="border-2 border-black px-3 py-1.5 text-xs font-bold uppercase tracking-widest transition-colors hover:bg-black hover:text-white"
+          >
             Sign out
           </button>
         </form>
-      </header>
+      </nav>
 
-      {error && (
-        <p
-          role="alert"
-          className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300"
-        >
-          {error}
-        </p>
-      )}
-
-      <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Your account
-        </h2>
-        <dl className="mt-3 space-y-1 text-sm">
-          <div className="flex gap-2">
-            <dt className="font-medium text-zinc-700 dark:text-zinc-300">Email:</dt>
-            <dd className="text-zinc-900 dark:text-zinc-100">{user.email}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="font-medium text-zinc-700 dark:text-zinc-300">Name:</dt>
-            <dd className="text-zinc-900 dark:text-zinc-100">
-              {profile?.full_name ?? '—'}
-            </dd>
-          </div>
-        </dl>
-        <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-500">
-          User ID: {user.id}
-        </p>
-      </section>
-
-      <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          New note
-        </h2>
-        <form action={createNote} className="mt-4 space-y-4">
-          <div className="space-y-1.5">
-            <label htmlFor="title" className={labelClass}>
-              Title
-            </label>
-            <input
-              id="title"
-              type="text"
-              name="title"
-              required
-              maxLength={200}
-              className={inputClass}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label htmlFor="body" className={labelClass}>
-              Body <span className="text-zinc-400">(optional)</span>
-            </label>
-            <textarea
-              id="body"
-              name="body"
-              rows={3}
-              className={inputClass}
-            />
-          </div>
-          <button type="submit" className={primaryBtn}>
-            Add note
-          </button>
-        </form>
-      </section>
-
-      <section className="mt-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Your notes ({notes?.length ?? 0})
-        </h2>
-        {notes && notes.length > 0 ? (
-          <ul className="mt-3 space-y-2">
-            {notes.map((note) => (
-              <li
-                key={note.id}
-                className="flex items-start justify-between gap-4 rounded-lg border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
-              >
-                <div className="min-w-0">
-                  <strong className="block text-zinc-900 dark:text-zinc-100">
-                    {note.title}
-                  </strong>
-                  {note.body && (
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
-                      {note.body}
-                    </p>
-                  )}
-                  <small className="mt-2 block text-xs text-zinc-500 dark:text-zinc-500">
-                    {new Date(note.created_at).toLocaleString()}
-                  </small>
-                </div>
-                <form action={deleteNote}>
-                  <input type="hidden" name="id" value={note.id} />
-                  <button
-                    type="submit"
-                    className="rounded-md border border-transparent px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
-                  >
-                    Delete
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-            No notes yet. Add one above.
+      <main className="mx-auto max-w-7xl px-6 py-10 md:px-12">
+        {error && (
+          <p
+            role="alert"
+            className="mb-6 border-2 border-red-600 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+          >
+            {error}
           </p>
         )}
-      </section>
-    </main>
+
+        <PersonaCard
+          rating={rating}
+          userPoints={userPoints}
+          maxPossible={maxPossible}
+          finishedCount={finishedFixtures.length}
+          fixtureCount={fixtures.length}
+        />
+
+        {/* Fixtures + Predictions form */}
+        <section>
+          <div className="mb-6 flex items-center justify-between border-b-2 border-black pb-4">
+            <h2 className="text-3xl font-black uppercase tracking-tight md:text-4xl">
+              Group Stage
+            </h2>
+            <span className="border-2 border-green-700 bg-green-700 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
+              Matchday 1
+            </span>
+          </div>
+
+          {fixtures.length === 0 ? (
+            <p className="text-sm text-neutral-600">No fixtures available yet.</p>
+          ) : (
+            <form action={savePredictions} className="space-y-4">
+              <div className="max-h-[600px] space-y-4 overflow-y-auto border-2 border-black bg-neutral-50 p-4">
+                {fixtures.map((f, i) => {
+                  const p = predictionByFixture.get(f.id);
+                  const isFinished = f.status === 'finished';
+                  const pts = scoreOne(f, p);
+                  const accent =
+                    i % 3 === 0
+                      ? 'border-l-8 border-l-green-700'
+                      : i % 3 === 1
+                        ? 'border-l-8 border-l-[#000080]'
+                        : 'border-l-8 border-l-red-600';
+                  const rowBg = isFinished
+                    ? 'bg-neutral-100 opacity-75'
+                    : 'bg-white';
+                  return (
+                    <div
+                      key={f.id}
+                      className={`flex flex-col items-stretch gap-4 border-2 border-black p-5 md:flex-row md:items-center md:gap-6 ${accent} ${rowBg}`}
+                      aria-disabled={isFinished}
+                    >
+                      <input type="hidden" name="fixture_id" value={f.id} />
+
+                      <div
+                        className={`flex-1 text-lg font-bold uppercase tracking-tight md:text-xl ${
+                          isFinished ? 'text-neutral-500' : ''
+                        }`}
+                      >
+                        {f.home_team}
+                      </div>
+
+                      <div className="flex items-center justify-center gap-2">
+                        <input
+                          type="number"
+                          name={`home_${f.id}`}
+                          min={0}
+                          max={20}
+                          defaultValue={p?.predicted_home_score ?? ''}
+                          placeholder="0"
+                          disabled={isFinished}
+                          className="h-16 w-16 border-2 border-black bg-white text-center text-2xl font-black focus:border-4 focus:border-green-700 focus:outline-none disabled:cursor-not-allowed disabled:border-neutral-400 disabled:bg-neutral-200 disabled:text-neutral-500 md:h-20 md:w-20 md:text-3xl"
+                        />
+                        <span
+                          className={`text-xl font-black ${
+                            isFinished ? 'text-neutral-500' : ''
+                          }`}
+                        >
+                          :
+                        </span>
+                        <input
+                          type="number"
+                          name={`away_${f.id}`}
+                          min={0}
+                          max={20}
+                          defaultValue={p?.predicted_away_score ?? ''}
+                          placeholder="0"
+                          disabled={isFinished}
+                          className="h-16 w-16 border-2 border-black bg-white text-center text-2xl font-black focus:border-4 focus:border-green-700 focus:outline-none disabled:cursor-not-allowed disabled:border-neutral-400 disabled:bg-neutral-200 disabled:text-neutral-500 md:h-20 md:w-20 md:text-3xl"
+                        />
+                      </div>
+
+                      <div
+                        className={`flex-1 text-right text-lg font-bold uppercase tracking-tight md:text-xl ${
+                          isFinished ? 'text-neutral-500' : ''
+                        }`}
+                      >
+                        {f.away_team}
+                      </div>
+
+                      <div className="flex shrink-0 flex-col items-end gap-1 md:w-32 md:items-end">
+                        {isFinished ? (
+                          <>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">
+                              Final
+                            </span>
+                            <span className="text-lg font-black">
+                              {f.home_score} – {f.away_score}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-white ${
+                                pts === 3
+                                  ? 'bg-green-700'
+                                  : pts === 1
+                                    ? 'bg-[#000080]'
+                                    : 'bg-neutral-400'
+                              }`}
+                            >
+                              {pts} pt{pts === 1 ? '' : 's'}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-500">
+                            Pending
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 pt-2 md:grid-cols-2">
+                <button
+                  type="submit"
+                  className="w-full bg-red-600 py-5 text-sm font-bold uppercase tracking-widest text-white transition-opacity hover:opacity-90"
+                >
+                  Lock In Predictions
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Separate form so simulate doesn't submit the predictions form */}
+          <form action={simulateResults} className="pt-4">
+            <button
+              type="submit"
+              className="w-full border-2 border-black bg-white py-5 text-sm font-bold uppercase tracking-widest text-black transition-colors hover:bg-black hover:text-white"
+            >
+              Simulate Results (Time Machine)
+            </button>
+          </form>
+        </section>
+
+        <footer className="mt-16 border-t-2 border-[#000080] py-6 text-center text-[10px] font-bold uppercase tracking-widest text-neutral-500">
+          © 2026 We Are 26 · Signed in as {user.email}
+        </footer>
+      </main>
+    </div>
   );
 }

@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      mock_fixtures: {
+        Row: {
+          away_score: number | null
+          away_team: string
+          home_score: number | null
+          home_team: string
+          id: string
+          status: string
+        }
+        Insert: {
+          away_score?: number | null
+          away_team: string
+          home_score?: number | null
+          home_team: string
+          id?: string
+          status?: string
+        }
+        Update: {
+          away_score?: number | null
+          away_team?: string
+          home_score?: number | null
+          home_team?: string
+          id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       notes: {
         Row: {
           body: string | null
@@ -40,6 +67,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      predictions: {
+        Row: {
+          fixture_id: string
+          id: string
+          predicted_away_score: number
+          predicted_home_score: number
+          user_id: string
+        }
+        Insert: {
+          fixture_id: string
+          id?: string
+          predicted_away_score: number
+          predicted_home_score: number
+          user_id: string
+        }
+        Update: {
+          fixture_id?: string
+          id?: string
+          predicted_away_score?: number
+          predicted_home_score?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "predictions_fixture_id_fkey"
+            columns: ["fixture_id"]
+            isOneToOne: false
+            referencedRelation: "mock_fixtures"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

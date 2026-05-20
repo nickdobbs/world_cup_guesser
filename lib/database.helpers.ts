@@ -24,3 +24,11 @@ export type ProfileUpdate = TablesUpdate<'profiles'>;
 export type Note = Tables<'notes'>;
 export type NoteInsert = TablesInsert<'notes'>;
 export type NoteUpdate = TablesUpdate<'notes'>;
+
+export type MockFixture = Tables<'mock_fixtures'>;
+export type MockFixtureInsert = TablesInsert<'mock_fixtures'>;
+export type MockFixtureUpdate = TablesUpdate<'mock_fixtures'>;
+
+export type Prediction = Tables<'predictions'>;
+export type PredictionInsert = TablesInsert<'predictions'>;
+export type PredictionUpdate = TablesUpdate<'predictions'>;
