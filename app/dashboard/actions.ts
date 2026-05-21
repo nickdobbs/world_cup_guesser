@@ -7,10 +7,14 @@ import { createClient } from '@/lib/supabase/server';
 import { env, getServerEnv } from '@/lib/env';
 import type { Database } from '@/lib/database.types';
 
-const FIXTURE_COUNT = 5;
+const FIXTURE_BATCH_SIZE = 5;
 
 function fail(message: string): never {
   redirect('/dashboard?error=' + encodeURIComponent(message));
+}
+
+function done(message: string): never {
+  redirect('/dashboard?notice=' + encodeURIComponent(message));
 }
 
 export async function savePredictions(formData: FormData) {
@@ -80,10 +84,13 @@ export async function simulateResults() {
   const { data: fixtures, error: fetchError } = await admin
     .from('mock_fixtures')
     .select('id')
+    .eq('status', 'pending')
     .order('id', { ascending: true })
-    .limit(FIXTURE_COUNT);
+    .limit(FIXTURE_BATCH_SIZE);
   if (fetchError) fail(fetchError.message);
-  if (!fixtures || fixtures.length === 0) fail('No fixtures to simulate');
+  if (!fixtures || fixtures.length === 0) {
+    done('No pending fixtures left to simulate. Hit Reset Demo Data to start over.');
+  }
 
   for (const f of fixtures) {
     const homeScore = Math.floor(Math.random() * 5);
@@ -100,5 +107,43 @@ export async function simulateResults() {
   }
 
   revalidatePath('/dashboard');
-  redirect('/dashboard');
+  done(`Simulated ${fixtures.length} fixture${fixtures.length === 1 ? '' : 's'}.`);
+}
+
+export async function resetFixtures() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login?next=/dashboard');
+
+  // mock_fixtures has no user-write RLS policy and we want to wipe predictions
+  // for ALL users (demo reset), so use the service-role client.
+  const { supabaseSecretKey } = getServerEnv();
+  const admin = createSupabaseAdmin<Database>(env.supabaseUrl, supabaseSecretKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  // Wipe every prediction. Supabase requires a filter on delete, so use a
+  // condition that matches every row.
+  const { error: delPredError } = await admin
+    .from('predictions')
+    .delete()
+    .not('id', 'is', null);
+  if (delPredError) fail(`Failed to clear predictions: ${delPredError.message}`);
+
+  // Reset every fixture back to pending with no score.
+  const { error: updError } = await admin
+    .from('mock_fixtures')
+    .update({
+      home_score: null,
+      away_score: null,
+      status: 'pending',
+    })
+    .not('id', 'is', null);
+  if (updError) fail(`Failed to reset fixtures: ${updError.message}`);
+
+  revalidatePath('/dashboard');
+  done('Demo data reset. All fixtures are pending again.');
 }

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { logout } from '../auth/actions';
-import { savePredictions, simulateResults } from './actions';
+import { resetFixtures, savePredictions, simulateResults } from './actions';
 import type { MockFixture, Prediction } from '@/lib/database.helpers';
 import PersonaCard from './PersonaCard';
 
@@ -30,9 +30,9 @@ function scoreOne(fixture: MockFixture, prediction: Prediction | undefined): num
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, notice } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -104,6 +104,15 @@ export default async function DashboardPage({
             className="mb-6 border-2 border-red-600 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
           >
             {error}
+          </p>
+        )}
+
+        {notice && !error && (
+          <p
+            role="status"
+            className="mb-6 border-2 border-[#000080] bg-blue-50 px-4 py-3 text-sm font-semibold text-[#000080]"
+          >
+            {notice}
           </p>
         )}
 
@@ -241,15 +250,25 @@ export default async function DashboardPage({
             </form>
           )}
 
-          {/* Separate form so simulate doesn't submit the predictions form */}
-          <form action={simulateResults} className="pt-4">
-            <button
-              type="submit"
-              className="w-full border-2 border-black bg-white py-5 text-sm font-bold uppercase tracking-widest text-black transition-colors hover:bg-black hover:text-white"
-            >
-              Simulate Results (Time Machine)
-            </button>
-          </form>
+          {/* Separate forms so demo buttons don't submit the predictions form */}
+          <div className="grid grid-cols-1 gap-4 pt-4 md:grid-cols-2">
+            <form action={simulateResults}>
+              <button
+                type="submit"
+                className="w-full border-2 border-black bg-white py-5 text-sm font-bold uppercase tracking-widest text-black transition-colors hover:bg-black hover:text-white"
+              >
+                Simulate Results (Time Machine)
+              </button>
+            </form>
+            <form action={resetFixtures}>
+              <button
+                type="submit"
+                className="w-full border-2 border-[#000080] bg-white py-5 text-sm font-bold uppercase tracking-widest text-[#000080] transition-colors hover:bg-[#000080] hover:text-white"
+              >
+                Reset Demo Data
+              </button>
+            </form>
+          </div>
         </section>
 
         <footer className="mt-16 border-t-2 border-[#000080] py-6 text-center text-[10px] font-bold uppercase tracking-widest text-neutral-500">
